@@ -1,10 +1,11 @@
-// admin-client/src/components/OrdersList.js
+// admin-client/src/components/OrdersList.js (versão atualizada)
 import React, { useState, useEffect } from 'react';
 import { orderStatusColors, statusLabels } from './StatusBadge';
 import OrderItem from './OrderItem';
 import OrderDetails from './OrderDetails';
 import OrderStatusFilter from './OrderStatusFilter';
 import { orderService } from '../services/apiService';
+import { getApiUrl, getApiHeaders } from '../utils/apiConfig'; // Importação do utilitário
 
 function OrdersList() {
   const [orders, setOrders] = useState([]);
@@ -23,7 +24,7 @@ function OrdersList() {
   const [limit] = useState(20);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Função para buscar pedidos pela primeira vez
+  // Função para buscar pedidos pela primeira vez - usando o serviço apiService
   const fetchInitialOrders = async () => {
     try {
       setIsInitialLoading(true);
