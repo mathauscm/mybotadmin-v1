@@ -26,9 +26,30 @@ const port = process.env.PORT || 3030;
 
 // Configuração de CORS aprimorada
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3030'],
+  origin: ['http://localhost:3000', 'http://localhost:3030', 'https://apimybot.innovv8.tech'],
   credentials: true
 }));
+
+// Add a proxy middleware for API requests
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+// Create proxy for API requests
+const apiProxy = createProxyMiddleware('/api', {
+  target: process.env.API_URL || 'https://apimybot.innovv8.tech/api',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api': '' // Remove /api from the URL
+  },
+  headers: {
+    'Authorization': `ApiKey ${process.env.API_KEY}`,
+    'X-Tenant-ID': process.env.TENANT_ID,
+    'Content-Type': 'application/json'
+  },
+  logLevel: 'debug'
+});
+
+// Use the proxy middleware
+app.use('/api', apiProxy);
 
 app.use(express.json());
 
