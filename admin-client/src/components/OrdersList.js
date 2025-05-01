@@ -4,6 +4,7 @@ import { orderStatusColors, statusLabels } from './StatusBadge';
 import OrderItem from './OrderItem';
 import OrderDetails from './OrderDetails';
 import OrderStatusFilter from './OrderStatusFilter';
+import { orderService } from '../services/apiService';
 
 function OrdersList() {
   const [orders, setOrders] = useState([]);
@@ -16,21 +17,29 @@ function OrdersList() {
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [lastOrderCount, setLastOrderCount] = useState(0);
   const [notificationSound] = useState(() => new Audio('/notification.mp3'));
+  
+  // Configuração de paginação
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Função para buscar pedidos pela primeira vez
   const fetchInitialOrders = async () => {
     try {
       setIsInitialLoading(true);
-      const response = await fetch('/api/orders');
       
-      if (!response.ok) {
-        throw new Error(`Erro ao buscar pedidos: ${response.status}`);
+      const data = await orderService.getOrders(page, limit);
+      
+      // Verifica se temos dados de pedidos
+      const ordersData = data.orders || [];
+      setLastOrderCount(ordersData.length);
+      setOrders(ordersData);
+      
+      // Atualiza informações de paginação
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages || 1);
       }
       
-      const data = await response.json();
-      
-      setLastOrderCount(data.orders ? data.orders.length : 0);
-      setOrders(data.orders || []);
       setError(null);
     } catch (error) {
       console.error('Erro ao buscar pedidos:', error);
@@ -46,16 +55,14 @@ function OrdersList() {
     
     try {
       setIsRefreshing(true);
-      const response = await fetch('/api/orders');
       
-      if (!response.ok) {
-        throw new Error(`Erro ao atualizar pedidos: ${response.status}`);
-      }
+      const data = await orderService.getOrders(page, limit);
       
-      const data = await response.json();
+      // Verifica se temos dados de pedidos
+      const ordersData = data.orders || [];
       
       // Verificar se há novos pedidos pendentes
-      const currentOrdersCount = data.orders ? data.orders.length : 0;
+      const currentOrdersCount = ordersData.length;
       
       // Se há mais pedidos do que antes, reproduz o som
       if (currentOrdersCount > lastOrderCount) {
@@ -68,7 +75,12 @@ function OrdersList() {
       }
       
       setLastOrderCount(currentOrdersCount);
-      setOrders(data.orders || []);
+      setOrders(ordersData);
+      
+      // Atualiza informações de paginação
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages || 1);
+      }
     } catch (error) {
       // Silenciosamente registra o erro, mas não mostra para o usuário
       // durante atualizações em segundo plano para evitar confusão
@@ -83,24 +95,14 @@ function OrdersList() {
     fetchInitialOrders();
     
     // Configurar atualização periódica
-    const intervalId = setInterval(refreshOrders, 5000);
+    const intervalId = setInterval(refreshOrders, 30000); // Atualizar a cada 30 segundos
     
     return () => clearInterval(intervalId);
-  }, []);
+  }, [page]); // Recarrega quando a página muda
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      const response = await fetch(`/api/orders/${orderId}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Erro ao atualizar status: ${response.status}`);
-      }
-      
-      const updatedOrder = await response.json();
+      const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
       
       // Atualizar a lista de pedidos
       setOrders(prevOrders => 
@@ -115,6 +117,13 @@ function OrdersList() {
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
       alert('Erro ao atualizar status do pedido. Por favor, tente novamente.');
+    }
+  };
+
+  // Função para alterar a página
+  const handlePageChange = (newPage) => {
+    if (newPage > 0 && newPage <= totalPages) {
+      setPage(newPage);
     }
   };
 
@@ -148,6 +157,31 @@ function OrdersList() {
       );
     }
     return null;
+  };
+
+  // Componente de paginação
+  const Pagination = () => {
+    return (
+      <div className="flex justify-center mt-4">
+        <button
+          onClick={() => handlePageChange(page - 1)}
+          disabled={page === 1}
+          className={`mr-2 px-3 py-1 rounded ${page === 1 ? 'bg-gray-200 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+        >
+          Anterior
+        </button>
+        <span className="px-3 py-1">
+          Página {page} de {totalPages}
+        </span>
+        <button
+          onClick={() => handlePageChange(page + 1)}
+          disabled={page === totalPages}
+          className={`ml-2 px-3 py-1 rounded ${page === totalPages ? 'bg-gray-200 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+        >
+          Próxima
+        </button>
+      </div>
+    );
   };
 
   return (
@@ -200,6 +234,9 @@ function OrdersList() {
           <p className="text-gray-500">Nenhum pedido encontrado com os filtros atuais.</p>
         </div>
       )}
+      
+      {/* Paginação */}
+      {orders.length > 0 && <Pagination />}
       
       {selectedOrder && (
         <OrderDetails 

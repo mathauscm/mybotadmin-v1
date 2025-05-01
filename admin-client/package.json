@@ -2,7 +2,7 @@
   "name": "admin-client",
   "version": "1.0.0",
   "main": "index.js",
-  "proxy": "http://localhost:3030",
+  "proxy": "https://apimybot.innovv8.tech",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
