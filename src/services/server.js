@@ -21,6 +21,22 @@ const productOptionsRoutes = require('./catalog/routes/productOptionsRoutes');
 
 require('dotenv').config();
 
+// Validate required environment variables
+const REQUIRED_ENV_VARS = ['API_URL', 'API_KEY', 'TENANT_ID'];
+const missingEnvVars = REQUIRED_ENV_VARS.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  logger.warn(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
+  logger.warn('Using default values for development');
+}
+
+// Default values for development
+const DEFAULT_CONFIG = {
+  API_URL: 'https://apimybot.innovv8.tech',
+  API_KEY: 'development_key',
+  TENANT_ID: 'default_tenant'
+};
+
 const app = express();
 const port = process.env.PORT || 3030;
 
@@ -34,15 +50,15 @@ app.use(cors({
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 // Create proxy for API requests
-const apiProxy = createProxyMiddleware('/api', {
-  target: process.env.API_URL || 'https://apimybot.innovv8.tech/api',
+const apiProxy = createProxyMiddleware({
+  target: process.env.API_URL || DEFAULT_CONFIG.API_URL,
   changeOrigin: true,
   pathRewrite: {
     '^/api': '' // Remove /api from the URL
   },
   headers: {
-    'Authorization': `ApiKey ${process.env.API_KEY}`,
-    'X-Tenant-ID': process.env.TENANT_ID,
+    'Authorization': `ApiKey ${process.env.API_KEY || DEFAULT_CONFIG.API_KEY}`,
+    'X-Tenant-ID': process.env.TENANT_ID || DEFAULT_CONFIG.TENANT_ID,
     'Content-Type': 'application/json'
   },
   logLevel: 'debug'
