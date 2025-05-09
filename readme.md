@@ -42,7 +42,7 @@ Um sistema completo para gerenciamento de loja de cookies, integrando painel adm
 - WhatsApp no smartphone (para autenticação inicial do bot)
 
 ## 🚀 Instalação
-## 🚀 Instalação
+
 
 ### Clonando o Repositório
 
