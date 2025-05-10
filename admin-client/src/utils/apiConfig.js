@@ -9,6 +9,9 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://apimybot.innovv8.tech/
 const API_KEY = process.env.REACT_APP_API_KEY || 'a005529cf26656d7291bdebbaabce7f7192a12d918bbdfb1b4c9ad23fc859c0f';
 const TENANT_ID = process.env.REACT_APP_TENANT_ID || '6813fab1dab14b9a1289ec45';
 
+const LOGIN_EMAIL = 'admin@cookier.com';
+const LOGIN_PASSWORD = 'cookier123';
+
 /**
  * Retorna a URL completa para um endpoint da API
  * @param {string} endpoint - Endpoint da API sem a URL base
@@ -38,6 +41,8 @@ export default {
   API_URL,
   API_KEY,
   TENANT_ID,
+  LOGIN_EMAIL,
+  LOGIN_PASSWORD,
   getApiUrl,
   getApiHeaders
 };

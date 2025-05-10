@@ -4,10 +4,51 @@
  * Serviço centralizado para comunicação com a API
  */
 
-// Obtém a URL da API das variáveis de ambiente ou usa o valor padrão
-const API_URL = process.env.REACT_APP_API_URL || 'https://apimybot.innovv8.tech/api';
-const API_KEY = process.env.REACT_APP_API_KEY || 'a005529cf26656d7291bdebbaabce7f7192a12d918bbdfb1b4c9ad23fc859c0f';
-const TENANT_ID = process.env.REACT_APP_TENANT_ID || '6813fab1dab14b9a1289ec45';
+import apiConfig from '../utils/apiConfig';
+
+// Obtém variáveis de configuração do apiConfig
+const API_URL = apiConfig.API_URL;
+const API_KEY = apiConfig.API_KEY;
+const TENANT_ID = apiConfig.TENANT_ID;
+const LOGIN_EMAIL = apiConfig.LOGIN_EMAIL;
+const LOGIN_PASSWORD = apiConfig.LOGIN_PASSWORD;
+
+// Variável para armazenar o token JWT
+let authToken = null;
+
+/**
+ * Realiza login na API e obtém um token JWT
+ * @returns {Promise<string>} - Token JWT
+ */
+export const login = async () => {
+  if (authToken) return authToken;
+  
+  try {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Tenant-ID': TENANT_ID
+      },
+      body: JSON.stringify({
+        email: LOGIN_EMAIL,
+        password: LOGIN_PASSWORD
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || `Login falhou: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    authToken = data.token;
+    return authToken;
+  } catch (error) {
+    console.error('Erro ao fazer login:', error);
+    throw error;
+  }
+};
 
 /**
  * Realiza requisições fetch com configurações padrão para a API
@@ -19,23 +60,75 @@ export const apiRequest = async (endpoint, options = {}) => {
   // Garante que o endpoint comece sem a barra
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
   
+  // Obter token (tentar login se necessário)
+  if (!authToken && endpoint !== 'auth/login') {
+    try {
+      await login();
+    } catch (error) {
+      console.error('Erro ao autenticar antes da requisição:', error);
+    }
+  }
+  
   // Configura headers padrão
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `ApiKey ${API_KEY}`,
     'X-Tenant-ID': TENANT_ID,
     ...options.headers
   };
   
+  // Adiciona token de autenticação se disponível
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
+  } else {
+    // Fallback para a chave de API se a autenticação falhar
+    headers['Authorization'] = `ApiKey ${API_KEY}`;
+  }
+  
   try {
-    const response = await fetch(`${API_URL}/${cleanEndpoint}`, {
+    console.log(`Fazendo requisição para: ${API_URL}/${cleanEndpoint}`);
+    console.log('Headers:', headers);
+    
+    // Adiciona opções de fetch
+    const fetchOptions = {
       ...options,
-      headers
-    });
+      headers,
+      mode: 'cors',
+      credentials: 'omit' // Desativar cookies para evitar problemas de CORS
+    };
+    
+    const response = await fetch(`${API_URL}/${cleanEndpoint}`, fetchOptions);
     
     // Verifica se a resposta é bem-sucedida (código 2xx)
     if (!response.ok) {
-      // Tenta obter detalhes do erro da resposta
+      // Se o erro for 401 Unauthorized e temos um token, podemos tentar renovar o token e tentar novamente
+      if (response.status === 401 && authToken) {
+        authToken = null; // Resetar o token atual
+        try {
+          // Tentar login novamente
+          await login();
+          
+          // Atualizar o header com o novo token
+          if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+            fetchOptions.headers = headers;
+            
+            // Tentar a requisição novamente
+            const retryResponse = await fetch(`${API_URL}/${cleanEndpoint}`, fetchOptions);
+            
+            if (retryResponse.ok) {
+              // Se a segunda tentativa for bem-sucedida
+              if (retryResponse.status === 204) {
+                return null;
+              }
+              return await retryResponse.json();
+            }
+          }
+        } catch (loginError) {
+          console.error('Erro ao renovar token:', loginError);
+        }
+      }
+      
+      // Se chegou aqui, não conseguiu resolver com retry ou não era erro 401
       let errorDetails;
       try {
         errorDetails = await response.json();
@@ -242,6 +335,22 @@ export const marketingService = {
     })
 };
 
+// Serviço para autenticação
+export const authService = {
+  login,
+  checkAuth: async () => {
+    try {
+      return await login();
+    } catch (error) {
+      return null;
+    }
+  },
+  logout: () => {
+    authToken = null;
+    console.log('Usuário deslogado');
+  }
+};
+
 // Exportar todos os serviços
 export default {
   orderService,
@@ -249,5 +358,6 @@ export default {
   categoryService,
   conversationService,
   productOptionsService,
-  marketingService
+  marketingService,
+  authService
 };
